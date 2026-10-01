@@ -1,0 +1,164 @@
+import axios from "axios";
+
+/**
+ * Axios instance for the platform API.
+ *
+ * Auth model: a short-lived access token is held in memory (mirrored to
+ * localStorage so a page reload can resume without a full re-login) and sent as
+ * a Bearer header. The refresh token lives in an httpOnly cookie the browser
+ * attaches automatically to /api/auth/* — so `withCredentials` is on.
+ *
+ * On a 401 the interceptor calls /api/auth/refresh once, then replays the
+ * original request. Concurrent 401s share a single refresh promise.
+ */
+
+const ACCESS_TOKEN_KEY = "hrm.accessToken";
+
+// 403 codes that mean "this session can no longer be used at all" — the
+// account or its whole organization was switched off. Sign out with a reason.
+const SESSION_ENDING_CODES = new Set(["ORG_INACTIVE", "ACCOUNT_SUSPENDED", "PLATFORM_MAINTENANCE"]);
+
+let accessToken = safeGet(ACCESS_TOKEN_KEY);
+let refreshPromise = null;
+const listeners = new Set();
+
+function safeGet(key) {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+function safeSet(key, value) {
+  try {
+    if (value == null) localStorage.removeItem(key);
+    else localStorage.setItem(key, value);
+  } catch {
+    /* storage disabled — token stays in memory only */
+  }
+}
+
+export function getAccessToken() {
+  return accessToken;
+}
+
+export function setAccessToken(token) {
+  accessToken = token || null;
+  safeSet(ACCESS_TOKEN_KEY, accessToken);
+}
+
+/** Subscribe to forced-logout events (refresh failed, account/org switched off). */
+export function onAuthExpired(fn) {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+}
+function emitExpired(reason) {
+  setAccessToken(null);
+  for (const fn of listeners) fn(reason);
+}
+
+/**
+ * Resolve an API-relative asset path ("/api/public/…", e.g. an organization
+ * logo) against VITE_API_URL, so <img> tags work when the API is served from a
+ * different origin than the SPA.
+ */
+export function apiAssetUrl(path) {
+  if (!path || !path.startsWith("/api/")) return path || null;
+  const base = import.meta.env.VITE_API_URL || "/api";
+  return base.replace(/\/api\/?$/, "") + path;
+}
+
+export const api = axios.create({
+  baseURL: import.meta.env.VITE_API_URL || "/api",
+  withCredentials: true,
+  timeout: 30_000,
+});
+
+api.interceptors.request.use((config) => {
+  if (accessToken) {
+    config.headers.Authorization = `Bearer ${accessToken}`;
+  }
+  return config;
+});
+
+async function runRefresh() {
+  // A single transient failure here (network blip, cold-starting API) should
+  // not sign the user out — only a real 401/403 (refresh token actually
+  // invalid/expired) should. Retry a couple of times first.
+  let lastErr;
+  for (let i = 0; i < 3; i++) {
+    try {
+      const { data } = await axios.post(
+        `${api.defaults.baseURL}/auth/refresh`,
+        {},
+        { withCredentials: true },
+      );
+      const next = data?.data?.accessToken;
+      if (!next) throw new Error("No access token in refresh response");
+      setAccessToken(next);
+      return next;
+    } catch (err) {
+      lastErr = err;
+      const status = err?.response?.status;
+      if (status === 401 || status === 403) throw err;
+      if (i < 2) await new Promise((r) => setTimeout(r, 500 * (i + 1)));
+    }
+  }
+  throw lastErr;
+}
+
+/**
+ * The refresh token rotates on every use — a stale cookie gets a real 401.
+ * Two refresh calls in flight at once (e.g. React StrictMode double-invoking
+ * a mount effect, or a 401 interceptor firing while bootstrap is already
+ * refreshing) would otherwise race: whichever loses presents an
+ * already-rotated cookie and signs the user out. Every caller in the app —
+ * bootstrap included — must go through this single in-flight promise instead
+ * of calling runRefresh() directly.
+ */
+export function refreshAccessToken() {
+  if (!refreshPromise) refreshPromise = runRefresh().finally(() => (refreshPromise = null));
+  return refreshPromise;
+}
+
+api.interceptors.response.use(
+  (res) => res,
+  async (error) => {
+    const { config, response } = error;
+    const code = response?.data?.error?.code;
+    if (response?.status === 403 && SESSION_ENDING_CODES.has(code)) {
+      emitExpired(response.data.error.message);
+      return Promise.reject(normaliseError(error));
+    }
+    if (!response || response.status !== 401 || config?._retried) {
+      return Promise.reject(normaliseError(error));
+    }
+    // Do not attempt to refresh the refresh/login calls themselves.
+    if (config.url?.includes("/auth/refresh") || config.url?.includes("/auth/login")) {
+      if (config.url?.includes("/auth/refresh")) emitExpired();
+      return Promise.reject(normaliseError(error));
+    }
+
+    config._retried = true;
+    try {
+      const token = await refreshAccessToken();
+      config.headers.Authorization = `Bearer ${token}`;
+      return api(config);
+    } catch (refreshErr) {
+      emitExpired();
+      return Promise.reject(normaliseError(refreshErr));
+    }
+  },
+);
+
+/** Collapse an axios error into a plain object the UI can render. */
+export function normaliseError(error) {
+  const payload = error?.response?.data?.error;
+  const err = new Error(payload?.message || error?.message || "Request failed");
+  err.code = payload?.code || "ERROR";
+  err.status = error?.response?.status;
+  err.details = payload?.details;
+  return err;
+}
+
+export default api;

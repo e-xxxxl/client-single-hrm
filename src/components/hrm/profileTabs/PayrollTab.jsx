@@ -1,0 +1,201 @@
+import { useState } from "react";
+import { HR_ADMIN_ROLES } from "../../../utils/constants.js";
+import Button from "../../ui/Button.jsx";
+import Badge from "../../ui/Badge.jsx";
+import DataTable from "../../ui/DataTable.jsx";
+import EmptyState from "../../ui/EmptyState.jsx";
+import Spinner from "../../ui/Spinner.jsx";
+import SalaryStructureForm from "../SalaryStructureForm.jsx";
+import PayslipView from "../PayslipView.jsx";
+import { useApiQuery } from "../../../hooks/useApiQuery.js";
+import { useMutation } from "../../../hooks/useMutation.js";
+import { useAuth } from "../../../store/auth.js";
+import { toast } from "../../../store/toast.js";
+import { money, dateShort } from "../../../utils/format.js";
+
+export default function PayrollTab({ employee, strategy }) {
+  const can = useAuth((s) => s.can);
+  const session = useAuth((s) => s.session);
+  const canView = can("payroll:read");
+  const canConfigure = can("payroll:configure");
+  // Deleting a salary structure record is restricted to exactly these three roles.
+  const canDeleteStructure = HR_ADMIN_ROLES.includes(session?.role);
+  const [editing, setEditing] = useState(false);
+  const [payslipId, setPayslipId] = useState(null);
+  const removeStructure = useMutation((client, structureId) =>
+    client.delete(`/hrm/payroll/structures/${employee.id}/${structureId}`),
+  );
+
+  const structure = useApiQuery(`/hrm/payroll/structures/${employee.id}`, { skip: !canView });
+  const payslips = useApiQuery("/hrm/payroll/payslips", {
+    params: { employee: employee.id, limit: 24 },
+    skip: !canView,
+  });
+
+  if (!canView) {
+    return (
+      <EmptyState
+        title="Restricted"
+        description="You do not have permission to view payroll information for this employee."
+      />
+    );
+  }
+
+  if (structure.loading) {
+    return (
+      <div className="flex justify-center py-10 text-ink-400">
+        <Spinner size={22} />
+      </div>
+    );
+  }
+
+  const current = structure.data?.current;
+  const history = structure.data?.history || [];
+
+  async function handleDelete(structureId, label) {
+    if (!confirm(`Delete this salary structure record (${label})? This cannot be undone.`)) return;
+    try {
+      await removeStructure.mutate(structureId);
+      toast.success("Salary structure deleted");
+      structure.refetch();
+    } catch (e) {
+      toast.error(e.message);
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="card p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-ink-900">Current salary structure</h3>
+          <div className="flex gap-2">
+            {canConfigure && (
+              <Button size="sm" variant="secondary" onClick={() => setEditing(true)}>
+                {current ? "Update" : "Set structure"}
+              </Button>
+            )}
+            {canDeleteStructure && current && (
+              <Button
+                size="sm"
+                variant="danger"
+                loading={removeStructure.loading}
+                onClick={() => handleDelete(current.id, "current")}
+              >
+                Delete
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {!current ? (
+          <p className="text-sm text-ink-500">No salary structure set. This employee is excluded from payroll runs.</p>
+        ) : (
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-3">
+            {strategy === "fixed-monthly" && <Row label="Gross monthly" value={money(current.grossMonthly || current.fixedGross)} />}
+            {strategy === "hybrid" && (
+              <>
+                <Row label="Base salary" value={money(current.basic)} />
+                <Row label="Per trip" value={money(current.commissionPerTrip)} />
+                {current.exGratia > 0 && <Row label="Ex gratia" value={money(current.exGratia)} />}
+                {current.referralBonus > 0 && <Row label="Referral bonus" value={money(current.referralBonus)} />}
+                {current.overtime > 0 && <Row label="Overtime" value={money(current.overtime)} />}
+              </>
+            )}
+            {strategy === "allowance-based" && (
+              <>
+                <Row label="Basic" value={money(current.basic)} />
+                <Row label="Housing" value={money(current.housing)} />
+                <Row label="Transport" value={money(current.transport)} />
+                <Row label="Subsidy" value={money(current.subsidy)} />
+                <Row label="Data allowance" value={money(current.dataAllowance)} />
+                {current.exGratia > 0 && <Row label="Ex gratia" value={money(current.exGratia)} />}
+                {current.referralBonus > 0 && <Row label="Referral bonus" value={money(current.referralBonus)} />}
+                {current.overtime > 0 && <Row label="Overtime" value={money(current.overtime)} />}
+              </>
+            )}
+            {current.latenessDeduction > 0 && <Row label="Lateness deduction" value={money(current.latenessDeduction)} />}
+            {current.otherDeductions > 0 && <Row label="Other deductions" value={money(current.otherDeductions)} />}
+            <Row label="PAYE" value={current.payeApplicable ? "Yes" : "No"} />
+            <Row label="Pension" value={current.pensionApplicable ? "Yes" : "No"} />
+            <Row label="NHF" value={current.nhfApplicable ? "Yes" : "No"} />
+            <Row label="Effective from" value={dateShort(current.effectiveFrom)} />
+          </dl>
+        )}
+      </div>
+
+      {history.length > 1 && (
+        <div>
+          <h3 className="mb-2 text-sm font-semibold text-ink-900">Salary history</h3>
+          <ul className="space-y-1.5 text-sm">
+            {history.map((h) => (
+              <li key={h.id} className="flex items-baseline justify-between gap-3">
+                <span className="text-ink-800">
+                  {money(
+                    h.grossMonthly ||
+                      h.basic + h.housing + h.transport + (h.subsidy || 0) + (h.dataAllowance || 0) +
+                        (h.exGratia || 0) + (h.referralBonus || 0) + (h.overtime || 0),
+                  )}
+                  {h.reason ? ` — ${h.reason}` : ""}
+                </span>
+                <span className="flex shrink-0 items-center gap-2 text-xs text-ink-500">
+                  {dateShort(h.effectiveFrom)} – {h.effectiveTo ? dateShort(h.effectiveTo) : "present"}
+                  {canDeleteStructure && h.id !== current?.id && (
+                    <button
+                      type="button"
+                      className="text-red-600 hover:text-red-700"
+                      onClick={() => handleDelete(h.id, dateShort(h.effectiveFrom))}
+                    >
+                      Delete
+                    </button>
+                  )}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div>
+        <h3 className="mb-2 text-sm font-semibold text-ink-900">Payslip history</h3>
+        <DataTable
+          loading={payslips.loading}
+          error={payslips.error}
+          rows={payslips.data || []}
+          keyField="id"
+          empty={{ title: "No payslips", description: "No payroll has been processed for this employee." }}
+          onRowClick={(p) => setPayslipId(p.id)}
+          columns={[
+            { key: "period", header: "Period", primary: true, render: (p) => p.periodLabel },
+            { key: "gross", header: "Gross", align: "right", render: (p) => money(p.grossEarnings) },
+            { key: "paye", header: "PAYE", align: "right", render: (p) => money(p.paye) },
+            { key: "net", header: "Net", align: "right", secondary: true, render: (p) => money(p.netPay) },
+            { key: "status", header: "Status", render: (p) => <Badge status={p.status}>{p.status}</Badge> },
+          ]}
+        />
+      </div>
+
+      {editing && (
+        <SalaryStructureForm
+          employeeId={employee.id}
+          strategy={strategy}
+          current={current}
+          onClose={() => setEditing(false)}
+          onSaved={() => {
+            setEditing(false);
+            structure.refetch();
+          }}
+        />
+      )}
+      {payslipId && <PayslipView id={payslipId} onClose={() => setPayslipId(null)} onChanged={payslips.refetch} />}
+    </div>
+  );
+}
+
+function Row({ label, value }) {
+  return (
+    <div>
+      <dt className="text-2xs uppercase tracking-wide text-ink-400">{label}</dt>
+      <dd className="mt-0.5 text-ink-800">{value}</dd>
+    </div>
+  );
+}
