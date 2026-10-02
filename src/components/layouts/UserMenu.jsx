@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../store/auth.js";
+import { toast } from "../../store/toast.js";
+import { useInstallApp } from "../../utils/pwa.js";
 
 export default function UserMenu({ name, email, role, avatar }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const navigate = useNavigate();
   const logout = useAuth((s) => s.logout);
+  const { canInstall, iosHint, install } = useInstallApp();
 
   useEffect(() => {
     function onClick(e) {
@@ -56,6 +59,20 @@ export default function UserMenu({ name, email, role, avatar }) {
             <p className="truncate text-xs text-ink-500">{email}</p>
             <p className="mt-0.5 text-2xs uppercase tracking-wide text-ink-400">{role}</p>
           </div>
+          {(canInstall || iosHint) && (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setOpen(false);
+                if (canInstall) install();
+                else toast.info("Tap the Share button, then “Add to Home Screen”.", { duration: 7000 });
+              }}
+              className="block w-full px-3 py-2 text-left text-sm text-ink-700 hover:bg-ink-50"
+            >
+              Install app
+            </button>
+          )}
           <button
             type="button"
             role="menuitem"

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import PageHeader from "../../components/ui/PageHeader.jsx";
 import Spinner from "../../components/ui/Spinner.jsx";
 import EmptyState from "../../components/ui/EmptyState.jsx";
@@ -19,6 +19,8 @@ import { dateShort, dateTime } from "../../utils/format.js";
 
 export default function OrganizationDetail() {
   const { id } = useParams();
+  const navigate = useNavigate();
+  const enterOrganization = useAuth((s) => s.enterOrganization);
   const canWrite = useAuth((s) => s.can("platform:write"));
   const { data, loading, error, refetch } = useApiQuery(`/platform/organizations/${id}`);
   const [statusModal, setStatusModal] = useState(false);
@@ -58,6 +60,20 @@ export default function OrganizationDetail() {
         actions={
           canWrite && (
             <>
+              {org.status === "active" && (
+                <Button
+                  onClick={async () => {
+                    try {
+                      await enterOrganization(org.id);
+                      navigate("/hrm", { replace: true });
+                    } catch (err) {
+                      toast.error(err.message);
+                    }
+                  }}
+                >
+                  Open HR workspace
+                </Button>
+              )}
               <Button variant="secondary" onClick={() => setEditing(true)}>
                 Edit details
               </Button>

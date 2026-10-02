@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import clsx from "clsx";
 import { useAuth } from "../../store/auth.js";
 import { initials } from "../../utils/format.js";
 import NotificationBell from "../notifications/NotificationBell.jsx";
 import UserMenu from "./UserMenu.jsx";
+import OrgSwitcher from "./OrgSwitcher.jsx";
 
 /**
  * Shared application chrome: dark sidebar, sticky header, responsive
@@ -61,18 +62,44 @@ export default function AppShell({ nav, sectionLabel, brandName, brandLogoUrl, c
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium text-ink-900">{brandName}</p>
             <p className="truncate text-2xs text-ink-500">
-              {session?.role} · {sectionLabel}
+              {session?.actingAs ? "Platform Admin" : session?.role} · {sectionLabel}
             </p>
           </div>
 
-          {showNotifications && <NotificationBell />}
+          <OrgSwitcher />
+          {showNotifications && !session?.actingAs && <NotificationBell />}
           <UserMenu name={user?.name} email={user?.email} role={session?.role} avatar={initials(user?.name)} />
         </header>
+
+        {session?.actingAs && <EnteredBanner orgName={brandName} />}
 
         <main className="mx-auto max-w-[1600px] px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
           <Outlet />
         </main>
       </div>
+    </div>
+  );
+}
+
+/** Shown while a Platform Admin is working inside an organization. */
+function EnteredBanner({ orgName }) {
+  const navigate = useNavigate();
+  const exitOrganization = useAuth((s) => s.exitOrganization);
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-900 sm:px-6">
+      <p>
+        You are working inside <strong>{orgName}</strong> as Platform Admin with Org Admin access. Your actions are recorded in its audit log.
+      </p>
+      <button
+        type="button"
+        className="font-medium underline hover:no-underline"
+        onClick={async () => {
+          await exitOrganization();
+          navigate("/platform", { replace: true });
+        }}
+      >
+        Back to platform console
+      </button>
     </div>
   );
 }

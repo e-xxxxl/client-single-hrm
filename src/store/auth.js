@@ -80,6 +80,22 @@ export const useAuth = create((set, get) => ({
     set({ status: "anonymous", pendingLogin: null });
   },
 
+  /** Platform Admin: enter (or switch to) an organization without signing out. */
+  async enterOrganization(organizationId) {
+    const { data } = await api.post("/auth/enter-org", { organizationId });
+    setAccessToken(data.data.accessToken);
+    set({ session: data.data.session });
+    await get().refreshProfile();
+  },
+
+  /** Platform Admin: leave the entered organization and go back to the platform console. */
+  async exitOrganization() {
+    const { data } = await api.post("/auth/exit-org");
+    setAccessToken(data.data.accessToken);
+    set({ session: data.data.session });
+    await get().refreshProfile();
+  },
+
   async logout() {
     try {
       await api.post("/auth/logout");

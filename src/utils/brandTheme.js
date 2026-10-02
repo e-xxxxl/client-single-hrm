@@ -31,4 +31,6 @@ export function applyBrandTheme(brandColor) {
   root.setProperty("--brand-700", colors[700]);
   root.setProperty("--brand-900", colors[900]);
   root.setProperty("--brand-800", colors[800]);
+  // Tint the browser / installed-app title bar to match the organization.
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", `rgb(${colors[900].replaceAll(" ", ",")})`);
 }
