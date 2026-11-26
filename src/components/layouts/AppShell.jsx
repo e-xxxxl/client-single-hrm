@@ -17,6 +17,7 @@ export default function AppShell({ nav, sectionLabel, brandName, brandLogoUrl, c
   const { session, user } = useAuth();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const orgKey = session?.organizationId ?? "platform";
 
   useEffect(() => {
     setMobileOpen(false);
@@ -67,13 +68,15 @@ export default function AppShell({ nav, sectionLabel, brandName, brandLogoUrl, c
           </div>
 
           <OrgSwitcher />
-          {showNotifications && !session?.actingAs && <NotificationBell />}
+          {showNotifications && !session?.actingAs && <NotificationBell key={orgKey} />}
           <UserMenu name={user?.name} email={user?.email} role={session?.role} avatar={initials(user?.name)} />
         </header>
 
         {session?.actingAs && <EnteredBanner orgName={brandName} />}
 
-        <main className="mx-auto max-w-[1600px] px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
+        {/* Keyed by organization: switching organizations remounts the page, so it
+            can never keep showing the previous organization's data. */}
+        <main key={orgKey} className="mx-auto max-w-[1600px] px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
           <Outlet />
         </main>
       </div>
@@ -110,14 +113,17 @@ function SidebarContent({ nav, sectionLabel, brandName, brandLogoUrl, contextLab
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex h-14 items-center gap-2 border-b border-sidebar-border px-5">
+      <div className="flex min-h-[3.5rem] items-center gap-2 border-b border-sidebar-border px-4 py-2.5">
         {brandLogoUrl && !logoFailed ? (
-          <img
-            src={brandLogoUrl}
-            alt={brandName || "Organization logo"}
-            className="h-9 max-w-[10rem] object-contain"
-            onError={() => setLogoFailed(true)}
-          />
+          // Logos are dark-on-light, so they sit on a white chip to stay readable on the dark sidebar.
+          <span className="inline-flex rounded-md bg-white px-2 py-1">
+            <img
+              src={brandLogoUrl}
+              alt={brandName || "Organization logo"}
+              className="h-9 max-w-[10.5rem] object-contain"
+              onError={() => setLogoFailed(true)}
+            />
+          </span>
         ) : (
           <span className="truncate text-sm font-semibold text-white">{brandName || "HRM Platform"}</span>
         )}

@@ -14,6 +14,7 @@ import { useAuth } from "../../store/auth.js";
 import { toast } from "../../store/toast.js";
 import { organization as orgApi } from "../../services/hrm.js";
 import { apiAssetUrl } from "../../services/api.js";
+import { defaultLogoFor } from "../../utils/orgLogo.js";
 import { BRAND_COLORS, HR_ADMIN_ROLES } from "../../utils/constants.js";
 import { brandSwatch } from "../../utils/brandTheme.js";
 
@@ -150,8 +151,14 @@ function OrganizationSettings() {
         <p className="mb-3 text-xs text-ink-500">Shown in the sidebar for everyone in {org.name}. PNG, JPEG or WebP, up to 2MB.</p>
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex h-16 min-w-[10rem] items-center justify-center rounded-md border border-ink-200 bg-sidebar px-4">
-            {org.logoUrl ? (
-              <img src={apiAssetUrl(org.logoUrl)} alt="Organization logo" className="h-10 max-w-[10rem] object-contain" />
+            {apiAssetUrl(org.logoUrl) || defaultLogoFor(org.code) ? (
+              <span className="inline-flex rounded-md bg-white px-2 py-1">
+                <img
+                  src={apiAssetUrl(org.logoUrl) || defaultLogoFor(org.code)}
+                  alt="Organization logo"
+                  className="h-9 max-w-[10rem] object-contain"
+                />
+              </span>
             ) : (
               <span className="text-sm font-semibold text-white">{org.name}</span>
             )}

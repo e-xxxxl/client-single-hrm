@@ -15,6 +15,10 @@ const BRAND_COLORS = {
   purple: { 600: "124 58 237", 700: "109 40 217", 900: "46 16 101", 800: "76 29 149" },
   teal: { 600: "13 148 136", 700: "15 118 110", 900: "4 47 46", 800: "17 94 89" },
   rose: { 600: "225 29 72", 700: "190 18 60", 900: "76 5 25", 800: "136 19 55" },
+  // Taken from the organizations' own logos:
+  navy: { 600: "40 40 150", 700: "26 26 118", 900: "8 8 54", 800: "20 20 92" }, // EsiatOptivest — logo navy rgb(2,1,102)
+  plum: { 600: "109 4 145", 700: "88 3 118", 900: "36 2 50", 800: "62 3 84" }, // PwweFoundation — logo purple rgb(109,4,145)
+  forest: { 600: "25 117 72", 700: "15 86 47", 900: "5 36 20", 800: "10 60 34" }, // SJI — logo green rgb(25,117,72)
 };
 
 /** Swatch colour for a preset (used by the colour picker). */

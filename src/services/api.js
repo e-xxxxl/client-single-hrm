@@ -151,10 +151,28 @@ api.interceptors.response.use(
   },
 );
 
-/** Collapse an axios error into a plain object the UI can render. */
+/** "bank.accountNumber" → "Account number" */
+function humanizePath(path) {
+  const last = String(path || "").split(".").filter(Boolean).pop();
+  if (!last) return "";
+  const words = last.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/**
+ * Collapse an axios error into a plain object the UI can render. A validation
+ * failure says *which* fields were wrong instead of a bare "Request validation
+ * failed" (field-level `details` stay available for inline errors).
+ */
 export function normaliseError(error) {
   const payload = error?.response?.data?.error;
-  const err = new Error(payload?.message || error?.message || "Request failed");
+  let message = payload?.message || error?.message || "Request failed";
+  const issues = payload?.details;
+  if (payload?.code === "VALIDATION_ERROR" && Array.isArray(issues) && issues.length) {
+    const shown = issues.slice(0, 3).map((d) => (d.path ? `${humanizePath(d.path)}: ${d.message}` : d.message));
+    message = shown.join(" · ") + (issues.length > 3 ? ` (+${issues.length - 3} more)` : "");
+  }
+  const err = new Error(message);
   err.code = payload?.code || "ERROR";
   err.status = error?.response?.status;
   err.details = payload?.details;

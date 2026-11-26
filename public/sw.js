@@ -16,10 +16,10 @@
  *
  * Bump CACHE_VERSION to force every client to drop its old caches.
  */
-const CACHE_VERSION = "v1";
+const CACHE_VERSION = "v2";
 const SHELL_CACHE = `hrm-shell-${CACHE_VERSION}`;
 const ASSET_CACHE = `hrm-assets-${CACHE_VERSION}`;
-const SHELL_FILES = ["/offline.html", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png", "/icons/icon.svg"];
+const SHELL_FILES = ["/offline.html", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png", "/logos/hrm.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(SHELL_CACHE).then((cache) => cache.addAll(SHELL_FILES)).then(() => self.skipWaiting()));
@@ -64,7 +64,7 @@ self.addEventListener("fetch", (event) => {
   }
 
   // Other shipped statics (icons, manifest): serve fast, refresh in the background.
-  if (SHELL_FILES.includes(url.pathname) || url.pathname.startsWith("/icons/")) {
+  if (SHELL_FILES.includes(url.pathname) || url.pathname.startsWith("/icons/") || url.pathname.startsWith("/logos/")) {
     event.respondWith(
       caches.open(SHELL_CACHE).then(async (cache) => {
         const hit = await cache.match(request);

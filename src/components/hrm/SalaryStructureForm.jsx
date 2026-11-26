@@ -18,7 +18,7 @@ import { money } from "../../utils/format.js";
 // immediately loses the trailing ".", making decimals impossible to enter.
 const MONEY_FIELDS = [
   "basic", "housing", "transport", "subsidy", "dataAllowance",
-  "exGratia", "referralBonus", "overtime", "latenessDeduction", "otherDeductions",
+  "exGratia", "referralBonus", "overtime", "thirteenthMonth", "latenessDeduction", "otherDeductions",
   "grossMonthly", "commissionPerTrip",
 ];
 const toNum = (v) => {
@@ -36,6 +36,7 @@ export default function SalaryStructureForm({ employeeId, strategy, current, onC
     exGratia: String(current?.exGratia ?? 0),
     referralBonus: String(current?.referralBonus ?? 0),
     overtime: String(current?.overtime ?? 0),
+    thirteenthMonth: String(current?.thirteenthMonth ?? 0),
     latenessDeduction: String(current?.latenessDeduction ?? 0),
     otherDeductions: String(current?.otherDeductions ?? 0),
     grossMonthly: String(current?.grossMonthly ?? 0),
@@ -52,6 +53,19 @@ export default function SalaryStructureForm({ employeeId, strategy, current, onC
 
   const num = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
   const chk = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.checked }));
+
+  // Shown in every strategy: an untaxed extra, kept apart from regular pay.
+  const thirteenthField = (
+    <TextField
+      label="13th month salary"
+      type="number"
+      min="0"
+      step="0.01"
+      hint="Not taxed · enter it for the month it is paid"
+      value={form.thirteenthMonth}
+      onChange={num("thirteenthMonth")}
+    />
+  );
 
   const allowanceGross =
     toNum(form.basic) + toNum(form.housing) + toNum(form.transport) + toNum(form.subsidy) +
@@ -100,14 +114,17 @@ export default function SalaryStructureForm({ employeeId, strategy, current, onC
         {error && !error.details && <Alert tone="error">{error.message}</Alert>}
 
         {strategy === "fixed-monthly" && (
-          <TextField
-            label="Gross monthly salary (NGN)"
-            type="number"
-            min="0"
-            step="0.01"
-            value={form.grossMonthly}
-            onChange={num("grossMonthly")}
-          />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <TextField
+              label="Gross monthly salary (NGN)"
+              type="number"
+              min="0"
+              step="0.01"
+              value={form.grossMonthly}
+              onChange={num("grossMonthly")}
+            />
+            {thirteenthField}
+          </div>
         )}
 
         {strategy === "hybrid" && (
@@ -124,6 +141,7 @@ export default function SalaryStructureForm({ employeeId, strategy, current, onC
             <TextField label="Ex gratia" type="number" min="0" step="0.01" value={form.exGratia} onChange={num("exGratia")} />
             <TextField label="Referral bonus" type="number" min="0" step="0.01" value={form.referralBonus} onChange={num("referralBonus")} />
             <TextField label="Overtime" type="number" min="0" step="0.01" hint="Not taxed" value={form.overtime} onChange={num("overtime")} />
+            {thirteenthField}
           </div>
         )}
 
@@ -137,6 +155,7 @@ export default function SalaryStructureForm({ employeeId, strategy, current, onC
             <TextField label="Ex gratia" type="number" min="0" step="0.01" value={form.exGratia} onChange={num("exGratia")} />
             <TextField label="Referral bonus" type="number" min="0" step="0.01" value={form.referralBonus} onChange={num("referralBonus")} />
             <TextField label="Overtime" type="number" min="0" step="0.01" hint="Not taxed" value={form.overtime} onChange={num("overtime")} />
+            {thirteenthField}
           </div>
         )}
 
@@ -183,6 +202,11 @@ export default function SalaryStructureForm({ employeeId, strategy, current, onC
           <span className="font-medium text-ink-900">{money(previewGross)}</span>
           {strategy === "hybrid" && (
             <span className="text-ink-500"> + commission per completed trip</span>
+          )}
+          {toNum(form.thirteenthMonth) > 0 && (
+            <span className="text-ink-500">
+              {" "}+ {money(toNum(form.thirteenthMonth))} 13th month (not taxed)
+            </span>
           )}
           {(toNum(form.latenessDeduction) > 0 || toNum(form.otherDeductions) > 0) && (
             <span className="text-ink-500">

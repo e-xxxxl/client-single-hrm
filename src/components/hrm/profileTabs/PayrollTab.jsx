@@ -92,6 +92,7 @@ export default function PayrollTab({ employee, strategy }) {
         ) : (
           <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-3">
             {strategy === "fixed-monthly" && <Row label="Gross monthly" value={money(current.grossMonthly || current.fixedGross)} />}
+            {current.thirteenthMonth > 0 && <Row label="13th month (not taxed)" value={money(current.thirteenthMonth)} />}
             {strategy === "hybrid" && (
               <>
                 <Row label="Base salary" value={money(current.basic)} />

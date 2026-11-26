@@ -105,6 +105,7 @@ export default function EmployeeProfile() {
           <span>
             {employee.employeeId} · {employee.position}
             {employee.department?.name ? ` · ${employee.department.name}` : ""}
+            {employee.user?.role ? ` · Access role: ${employee.user.role}` : ""}
           </span>
         }
         actions={
@@ -119,7 +120,7 @@ export default function EmployeeProfile() {
             )}
             {isOrgAdmin && employee.user && (
               <Button variant="secondary" onClick={() => setManageLoginModal(true)}>
-                Manage login
+                Change role / login
               </Button>
             )}
             {canWrite && <Button onClick={() => setEditing(true)}>Edit</Button>}
@@ -343,7 +344,13 @@ function ManageLoginModal({ employee, onClose, onDone }) {
     setSaving(true);
     setSaveError("");
     try {
-      await employeesApi.updateLogin(employee.id, form);
+      // Send only what changed — an unchanged role or status is not a request to change it.
+      const changes = Object.fromEntries(Object.entries(form).filter(([k, v]) => v !== login[k]));
+      if (Object.keys(changes).length === 0) {
+        onDone();
+        return;
+      }
+      await employeesApi.updateLogin(employee.id, changes);
       toast.success("Login details updated");
       onDone();
     } catch (e) {
@@ -371,7 +378,7 @@ function ManageLoginModal({ employee, onClose, onDone }) {
     <Modal
       open
       onClose={onClose}
-      title="Manage login"
+      title="Role & login"
       description={`${employee.firstName} ${employee.lastName}`}
       footer={
         <>
@@ -406,9 +413,12 @@ function ManageLoginModal({ employee, onClose, onDone }) {
             />
             <Select
               label="Role"
-              options={assignableRoles}
+              // Always include the current role so the dropdown never shows blank,
+              // even when it is above what the signed-in user may assign.
+              options={[...new Set([login.role, ...assignableRoles])]}
               value={form.role}
               onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
+              hint="Takes effect immediately. You can only grant roles below your own."
             />
             <Select
               label="Status"

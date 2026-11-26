@@ -20,7 +20,7 @@ export function assignableRoles(actorRole) {
   return rank === -1 ? [] : ROLES.slice(rank + 1);
 }
 
-export const BRAND_COLORS = ["blue", "green", "amber", "orange", "purple", "teal", "rose"];
+export const BRAND_COLORS = ["blue", "navy", "green", "forest", "amber", "orange", "plum", "purple", "teal", "rose"];
 
 export const PAYROLL_STRATEGIES = [
   { value: "fixed-monthly", label: "Fixed monthly" },

@@ -84,43 +84,46 @@ export default function EmployeeForm({ value = {}, onClose, onSaved }) {
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
+  /** Only what was actually filled in — blank inputs are left out, not sent as "". */
   function buildBody() {
+    const t = (v) => (typeof v === "string" ? v.trim() : v) || undefined;
     const b = {
-      employeeId: form.employeeId || undefined,
-      firstName: form.firstName,
-      middleName: form.middleName || undefined,
-      lastName: form.lastName,
-      email: form.email,
-      phone: form.phone,
-      altPhone: form.altPhone || undefined,
-      dateOfBirth: form.dateOfBirth || undefined,
-      gender: form.gender || undefined,
-      maritalStatus: form.maritalStatus || undefined,
-      stateOfOrigin: form.stateOfOrigin || undefined,
-      lga: form.lga || undefined,
-      residentialAddress: form.residentialAddress || undefined,
-      residentialState: form.residentialState || undefined,
-      position: form.position,
-      grade: form.grade || undefined,
-      department: form.department || undefined,
-      branch: form.branch || undefined,
-      reportingManager: form.reportingManager || undefined,
-      employmentType: form.employmentType,
-      employmentStatus: form.employmentStatus,
-      dateJoined: form.dateJoined,
-      confirmationDate: form.confirmationDate || undefined,
-      contractEndDate: form.contractEndDate || undefined,
-      taxId: form.taxId || undefined,
-      taxState: form.taxState || undefined,
+      employeeId: t(form.employeeId),
+      firstName: t(form.firstName),
+      middleName: t(form.middleName),
+      lastName: t(form.lastName),
+      email: t(form.email),
+      phone: t(form.phone),
+      altPhone: t(form.altPhone),
+      dateOfBirth: t(form.dateOfBirth),
+      gender: t(form.gender),
+      maritalStatus: t(form.maritalStatus),
+      stateOfOrigin: t(form.stateOfOrigin),
+      lga: t(form.lga),
+      residentialAddress: t(form.residentialAddress),
+      residentialState: t(form.residentialState),
+      position: t(form.position),
+      grade: t(form.grade),
+      department: t(form.department),
+      branch: t(form.branch),
+      reportingManager: t(form.reportingManager),
+      employmentType: t(form.employmentType),
+      employmentStatus: t(form.employmentStatus),
+      dateJoined: t(form.dateJoined),
+      confirmationDate: t(form.confirmationDate),
+      contractEndDate: t(form.contractEndDate),
+      taxId: t(form.taxId),
+      taxState: t(form.taxState),
     };
-    const contact = {
-      name: form.emergencyName,
-      relationship: form.emergencyRelationship,
-      phone: form.emergencyPhone,
+    const contact = { name: t(form.emergencyName), relationship: t(form.emergencyRelationship), phone: t(form.emergencyPhone) };
+    if (contact.name || contact.relationship || contact.phone) b.emergencyContact = contact;
+    // Account numbers are often typed with spaces or dashes — keep the digits.
+    const bank = {
+      bankName: t(form.bankName),
+      accountNumber: t(form.accountNumber?.replace(/\D/g, "")),
+      accountName: t(form.accountName),
     };
-    if (contact.name || contact.phone) b.emergencyContact = contact;
-    const bank = { bankName: form.bankName, accountNumber: form.accountNumber, accountName: form.accountName };
-    if (bank.bankName || bank.accountNumber) b.bank = bank;
+    if (bank.bankName || bank.accountNumber || bank.accountName) b.bank = bank;
     return b;
   }
 
@@ -178,7 +181,7 @@ export default function EmployeeForm({ value = {}, onClose, onSaved }) {
       }
     >
       <form id="emp-form" onSubmit={submit} className="space-y-6">
-        {error && !error.details && (
+        {error && (
           <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
             {error.message}
           </p>
@@ -272,7 +275,7 @@ export default function EmployeeForm({ value = {}, onClose, onSaved }) {
 
         <Section title="Payroll details">
           <TextField label="Bank name" value={form.bankName} onChange={set("bankName")} />
-          <TextField label="Account number" value={form.accountNumber} error={errs["bank.accountNumber"]} onChange={set("accountNumber")} maxLength={10} />
+          <TextField label="Account number" value={form.accountNumber} error={errs["bank.accountNumber"]} onChange={set("accountNumber")} inputMode="numeric" hint="10-digit NUBAN number" />
           <TextField label="Account name" value={form.accountName} onChange={set("accountName")} />
           <TextField label="Tax ID (TIN)" value={form.taxId} onChange={set("taxId")} />
           <Select label="Tax state" options={NIGERIAN_STATES} value={form.taxState} onChange={set("taxState")} />
